@@ -91,7 +91,7 @@ timestamp_format = 'auto'
 null_if = ('\\N')
 ;
 
-create or replace procedure INFER_DELIMITED_SCHEMA(STAGE_PATH string, FILE_FORMAT string, FIRST_ROW_IS_HEADER boolean, NEW_TABLE_NAME string)
+create or replace procedure UTIL_DB.PUBLIC.INFER_DELIMITED_SCHEMA(STAGE_PATH string, FILE_FORMAT string, FIRST_ROW_IS_HEADER boolean, NEW_TABLE_NAME string)
 returns string
 language javascript
 execute as caller
@@ -105,6 +105,7 @@ $$
 MAX_ROW_SAMPLES          = 100000;        // Sets the maximum number of rows the inference will test.
 PROJECT_NAMESPACE        = "UTIL_DB.PUBLIC"
 USE_TRY_MULTI_TIMESTAMP  = true;
+REGULARIZE_COLUMN_NAMES  = true;
 NUMBERED_COLUMN_PREFIX   = "COLUMN_";
 
 /****************************************************************************************************
@@ -159,7 +160,7 @@ class DateType extends DataType{
     constructor(column, ordinalPosition, sourceQuery){
         super(column, ordinalPosition, sourceQuery)
         this.syntax = "date";
-        this.insert = `${PROJECT_NAMESPACE}.try_exact_date(trim(@~COLUMN~@))`;
+        this.insert = `${PROJECT_NAMESPACE}.try_exact_date(trim("@~COLUMN~@"))`;
         this.sourceQuery = sourceQuery;
         this.setSQL(GetCheckTypeSQL(this.insert, this.sourceQuery));
         this.getCounts();
@@ -170,7 +171,7 @@ class TimestampType extends DataType{
     constructor(column, ordinalPosition, sourceQuery){
         super(column, ordinalPosition, sourceQuery)
         this.syntax = "timestamp";
-        this.insert = `${PROJECT_NAMESPACE}.try_multi_timestamp(trim(@~COLUMN~@))`;
+        this.insert = `${PROJECT_NAMESPACE}.try_multi_timestamp(trim("@~COLUMN~@"))`;
         this.sourceQuery = sourceQuery;
         this.setSQL(GetCheckTypeSQL(this.insert, this.sourceQuery));
         this.getCounts();
@@ -181,7 +182,7 @@ class IntegerType extends DataType{
     constructor(column, ordinalPosition, sourceQuery){
         super(column, ordinalPosition, sourceQuery)
         this.syntax = "number(38,0)";
-        this.insert = `${PROJECT_NAMESPACE}.try_exact_integer(trim(@~COLUMN~@))`;
+        this.insert = `${PROJECT_NAMESPACE}.try_exact_integer(trim("@~COLUMN~@"))`;
         this.setSQL(GetCheckTypeSQL(this.insert, this.sourceQuery));
         this.getCounts();
     }
@@ -191,7 +192,7 @@ class DoubleType extends DataType{
     constructor(column, ordinalPosition, sourceQuery){
         super(column, ordinalPosition, sourceQuery)
         this.syntax = "double";
-        this.insert = 'try_to_double(trim(@~COLUMN~@))';
+        this.insert = 'try_to_double(trim("@~COLUMN~@"))';
         this.setSQL(GetCheckTypeSQL(this.insert, this.sourceQuery));
         this.getCounts();
     }
@@ -201,7 +202,7 @@ class BooleanType extends DataType{
     constructor(column, ordinalPosition, sourceQuery){
         super(column, ordinalPosition, sourceQuery)
         this.syntax = "boolean";
-        this.insert = 'try_to_boolean(trim(@~COLUMN~@))';
+        this.insert = 'try_to_boolean(trim("@~COLUMN~@"))';
         this.setSQL(GetCheckTypeSQL(this.insert, this.sourceQuery));
         this.getCounts();
     }
@@ -239,11 +240,15 @@ if (FIRST_ROW_IS_HEADER) {
     }
 }
 
+if (REGULARIZE_COLUMN_NAMES) {
+    header = regularizeColumnNames(header);
+}
+
 let sql = "select\n";
 for (let i = 0; i < header.length; i++) {
-    sql += (i > 0 ? ",$" : "$") + `${i+1} as ${header[i]}\n`;
+    sql += (i > 0 ? ",$" : "$") + `${i+1} as "${header[i]}"\n`;
 }
-sql += `from ${STAGE_PATH} ( file_format => 'SKIP_HEADER') limit ${MAX_ROW_SAMPLES}`;
+sql += `from ${STAGE_PATH} ( file_format => '${FILE_FORMAT}') limit ${MAX_ROW_SAMPLES}`;
 
 let qMain = GetQuery(sql);
 
@@ -260,7 +265,7 @@ for (let c = 0; c < header.length; c++) {
         insertDML   += ",\n";
     }
     if (FIRST_ROW_IS_HEADER) {
-        column = header[c];
+        column = '"' + header[c] + '"';
     } else {
         column = "$" + c+1;
     }
@@ -294,7 +299,7 @@ function InferDataType(column, ordinalPosition, sourceQuery){
     typeOf = new DoubleType(column, ordinalPosition, sourceQuery);
     if (typeOf.isCorrectType()) return typeOf;
 
-    typeOf = new BooleanType(column, ordinalPosition, sourceQuery);
+    typeOf = new BooleanType(column, ordinalPosition, sourceQuery);        // May want to do a distinct and look for two values
     if (typeOf.isCorrectType()) return typeOf;
 
     typeOf = new DateType(column, ordinalPosition, sourceQuery);
@@ -307,6 +312,17 @@ function InferDataType(column, ordinalPosition, sourceQuery){
     if (typeOf.isCorrectType()) return typeOf;
 
     return null;
+}
+
+function regularizeColumnNames(header) {
+    s = "";
+    newHeader = [];
+    for (let i = 0; i < header.length; i++) {
+        s = header[i];
+        s = s.replace(/ /g,"_").toUpperCase();
+        newHeader.push(s);
+    }
+    return newHeader;
 }
 
 function GetQuery(sql){
