@@ -91,10 +91,10 @@ timestamp_format = 'auto'
 null_if = ('\\N')
 ;
 
-create or replace procedure UTIL_DB.PUBLIC.INFER_DELIMITED_SCHEMA(STAGE_PATH string, FILE_FORMAT string, FIRST_ROW_IS_HEADER boolean, NEW_TABLE_NAME string)
+create or replace procedure INFER_DELIMITED_SCHEMA(STAGE_PATH string, FILE_FORMAT string, FIRST_ROW_IS_HEADER boolean, NEW_TABLE_NAME string)
 returns string
 language javascript
-execute as caller       -- This is for Disney (find the Jira) and Jerome Caron
+execute as caller
 as
 $$
 
@@ -294,7 +294,7 @@ function InferDataType(column, ordinalPosition, sourceQuery){
     typeOf = new DoubleType(column, ordinalPosition, sourceQuery);
     if (typeOf.isCorrectType()) return typeOf;
 
-    typeOf = new BooleanType(column, ordinalPosition, sourceQuery);        // May want to do a distinct and look for two values
+    typeOf = new BooleanType(column, ordinalPosition, sourceQuery);
     if (typeOf.isCorrectType()) return typeOf;
 
     typeOf = new DateType(column, ordinalPosition, sourceQuery);
