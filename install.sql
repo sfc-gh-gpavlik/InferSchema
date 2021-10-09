@@ -488,7 +488,166 @@ function getQuery(sql){
 }
 
 $$;
-  
--- Sample usage:
--- call UTIL_DB.PUBLIC.INFER_DELIMITED_SCHEMA('@CSV_INFER_SCHEMA.PUBLIC.TPCH_CSV', '"CSV_INFER_SCHEMA"."PUBLIC".SKIP_HEADER', true, 'TPCH_INFERRED');
 
+create or replace procedure create_view_over_variant (TABLE_NAME varchar, COL_NAME varchar, VIEW_NAME varchar)
+returns varchar
+language javascript
+as
+$$
+/****************************************************************************************************************
+*                                                                                                               *
+* CREATE_VIEW_OVER_JSON - Craig Warman, Alan Eldridge and Greg Pavlik Snowflake Computing, 2019, 2020, 2021     *
+*                                                                                                               *
+* This stored procedure creates a view on a table that contains JSON data in a column.                          *
+* of type VARIANT.  It can be used for easily generating views that enable access to                            *
+* this data for BI tools without the need for manual view creation based on the underlying                      *
+* JSON document structure.                                                                                      *
+*                                                                                                               *
+* Parameters:                                                                                                   *
+* TABLE_NAME    - Name of table that contains the semi-structured data.                                         *
+* COL_NAME      - Name of VARIANT column in the aforementioned table.                                           *
+* VIEW_NAME     - Name of view to be created by this stored procedure.                                          *
+*                                                                                                               *
+* Usage Example:                                                                                                *
+* call create_view_over_json('db.schema.semistruct_data', 'variant_col', 'db.schema.semistruct_data_vw');       *
+*                                                                                                               *
+* Important notes:                                                                                              *
+*   - This is the "basic" version of a more sophisticated procedure. Its primary purpose                        *
+*     is to illustrate the view generation concept.                                                             *
+*   - This version of the procedure does not support:                                                           *
+*         - Column case preservation (all view column names will be case-insensitive).                          *
+*         - JSON document attributes that are SQL reserved words (like TYPE or NUMBER).                         *
+*         - "Exploding" arrays into separate view columns - instead, arrays are simply                          *
+*           materialized as view columns of type ARRAY.                                                         *
+*   - Execution of this procedure may take an extended period of time for very                                  *
+*     large datasets, or for datasets with a wide variety of document attributes                                *
+*     (since the view will have a large number of columns).                                                     *
+*                                                                                                               *
+* Attribution:                                                                                                  *
+* I leveraged code developed by Alan Eldridge as the basis for this stored procedure.                           *
+*                                                                                                               *
+****************************************************************************************************************/
+
+var currentActivity;
+
+try{
+
+    currentActivity   = "building the query for column types";
+    var elementQuery  = GetElementQuery(TABLE_NAME, COL_NAME);
+    
+    currentActivity   = "running the query to get column names";
+    var elementRS     = GetResultSet(elementQuery);
+
+    currentActivity   = "building the column list";
+    var colList       = GetColumnList(elementRS);
+
+    currentActivity   = "building the view's DDL";
+    var viewDDL       = GetViewDDL(VIEW_NAME, colList, TABLE_NAME);
+
+    currentActivity   = "creating the view";
+    return ExecuteSingleValueQuery("status", viewDDL);
+}
+catch(err){
+    return "ERROR: Encountered an error while " + currentActivity + ".\n" + err.message;
+}
+
+/****************************************************************************************************************
+*   End of main function. Helper functions below.                                                               *
+****************************************************************************************************************/
+
+function GetElementQuery(tableName, columnName){
+
+// Build a query that returns a list of elements which will be used to build the column list for the CREATE VIEW statement
+
+sql = 
+`
+
+SELECT DISTINCT regexp_replace(regexp_replace(f.path,'\\\\[(.+)\\\\]'),'(\\\\w+)','\"\\\\1\"')                      AS path_name,       -- This generates paths with levels enclosed by double quotes (ex: "path"."to"."element").  It also strips any bracket-enclosed array element references (like "[0]")
+                DECODE (substr(typeof(f.value),1,1),'A','ARRAY','B','BOOLEAN','I','FLOAT','D','FLOAT','STRING')     AS attribute_type,  -- This generates column datatypes of ARRAY, BOOLEAN, FLOAT, and STRING only
+                REGEXP_REPLACE(REGEXP_REPLACE(f.path, '\\\\[(.+)\\\\]'),'[^a-zA-Z0-9]','_')                         AS alias_name       -- This generates column aliases based on the path
+FROM
+        @~TABLE_NAME~@,
+        LATERAL FLATTEN(@~COL_NAME~@, RECURSIVE=>true) f
+WHERE   TYPEOF(f.value) != 'OBJECT'
+        AND NOT contains(f.path, '[');         -- This prevents traversal down into arrays
+
+`;
+
+    sql = sql.replace(/@~TABLE_NAME~@/g, tableName);
+    sql = sql.replace(/@~COL_NAME~@/g, columnName);
+
+    return sql;
+}
+
+function GetColumnList(elementRS){
+
+    /*  
+        Add elements and datatypes to the column list
+        They will look something like this when added:
+            col_name:"name"."first"::STRING as name_first,
+            col_name:"name"."last"::STRING as name_last
+    */
+
+    var col_list = "";
+
+    while (elementRS.next()) {
+        if (col_list != "") {
+            col_list += ", \n";
+        }
+        col_list += COL_NAME + ":" + elementRS.getColumnValue("PATH_NAME");         // Start with the element path name
+        col_list += "::"           + elementRS.getColumnValue("ATTRIBUTE_TYPE");    // Add the datatype
+        col_list += " as "         + elementRS.getColumnValue("ALIAS_NAME");        // And finally the element alias
+    }
+    return col_list;
+}
+
+function GetViewDDL(viewName, columnList, tableName){
+
+sql = 
+`
+create or replace view @~VIEW_NAME~@ as
+select 
+    @~COLUMN_LIST~@
+from @~TABLE_NAME~@;
+`;
+    sql = sql.replace(/@~VIEW_NAME~@/g, viewName);
+    sql = sql.replace(/@~COLUMN_LIST~@/g, columnList);
+    sql = sql.replace(/@~TABLE_NAME~@/g, tableName);
+
+    return sql;
+}
+
+/****************************************************************************************************************
+*   Library functions                                                                                           *
+****************************************************************************************************************/
+
+function ExecuteSingleValueQuery(columnName, queryString) {
+    var out;
+    cmd1 = {sqlText: queryString};
+    stmt = snowflake.createStatement(cmd1);
+    var rs;
+    try{
+        rs = stmt.execute();
+        rs.next();
+        return rs.getColumnValue(columnName);
+    }
+    catch(err) {
+        throw err;
+    }
+    return out;
+}
+
+function GetResultSet(sql){
+
+    try{
+        cmd1 = {sqlText: sql};
+        stmt = snowflake.createStatement(cmd1);
+        var rs;
+        rs = stmt.execute();
+        return rs;
+    }
+    catch(err) {
+        throw err;
+    } 
+}
+$$;
