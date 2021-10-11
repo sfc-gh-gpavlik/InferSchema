@@ -1,6 +1,6 @@
 /********************************************************************************************************
 *                                                                                                       *
-*                                  Snowflake Infer Delimited Schema                                     *
+*                                     Snowflake Infer Schema                                            *
 *                                                                                                       *
 *  Copyright (c) 2021 Snowflake Computing Inc. All rights reserved.                                     *
 *                                                                                                       *
