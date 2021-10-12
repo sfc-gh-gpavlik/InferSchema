@@ -489,7 +489,7 @@ function getQuery(sql){
 
 $$;
 
-create or replace procedure create_view_over_variant (TABLE_NAME varchar, COL_NAME varchar, VIEW_NAME varchar)
+create or replace procedure util_db.public.create_view_over_variant (TABLE_NAME varchar, COL_NAME varchar, VIEW_NAME varchar)
 returns varchar
 language javascript
 as
@@ -527,6 +527,8 @@ $$
 * I leveraged code developed by Alan Eldridge as the basis for this stored procedure.                           *
 *                                                                                                               *
 ****************************************************************************************************************/
+
+const ROW_SAMPLE_SIZE = 10000;
 
 var currentActivity;
 
@@ -569,8 +571,8 @@ FROM
         @~TABLE_NAME~@,
         LATERAL FLATTEN(@~COL_NAME~@, RECURSIVE=>true) f
 WHERE   TYPEOF(f.value) != 'OBJECT'
-        AND NOT contains(f.path, '[');         -- This prevents traversal down into arrays
-
+        AND NOT contains(f.path, '[')         -- This prevents traversal down into arrays
+limit   ${ROW_SAMPLE_SIZE};
 `;
 
     sql = sql.replace(/@~TABLE_NAME~@/g, tableName);
