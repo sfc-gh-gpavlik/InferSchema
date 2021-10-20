@@ -276,14 +276,14 @@ for (let c = 0; c < header.length; c++) {
     insertDML   += ins.replace(/@~COLUMN~@/g, "$" + typeOf.ordinalPosition);
 }
 
-return GetOpeningComments()                +
-       GetDDLPrefixSQL(NEW_TABLE_NAME)     +
-       newTableDDL                         +
-       GetDDLSuffixSQL()                   +
-       GetDividerSQL()                     +
-       GetInsertPrefixSQL(NEW_TABLE_NAME)  +
-       insertDML                           +
-       GetInsertSuffixSQL(STAGE_PATH)      ;
+return GetOpeningComments()                       +
+       GetDDLPrefixSQL(NEW_TABLE_NAME)            +
+       newTableDDL                                +
+       GetDDLSuffixSQL()                          +
+       GetDividerSQL()                            +
+       GetInsertPrefixSQL(NEW_TABLE_NAME)         +
+       insertDML                                  +
+       GetInsertSuffixSQL(STAGE_PATH, FILE_FORMAT);
 
 /****************************************************************************************************
 *  Helper functions                                                                                 *
@@ -410,9 +410,9 @@ var sql =
 return sql;
 }
 
-function GetInsertSuffixSQL(stagePath){
+function GetInsertSuffixSQL(stagePath, fileFormat){
 var sql =
-`\nfrom ${stagePath} ;`;
+`\nfrom ${stagePath} (file_format => '${fileFormat}');`;
 return sql;
 }
 
@@ -563,7 +563,6 @@ function GetElementQuery(tableName, columnName){
 
 sql = 
 `
-
 SELECT DISTINCT regexp_replace(regexp_replace(f.path,'\\\\[(.+)\\\\]'),'(\\\\w+)','\"\\\\1\"')                      AS path_name,       -- This generates paths with levels enclosed by double quotes (ex: "path"."to"."element").  It also strips any bracket-enclosed array element references (like "[0]")
                 DECODE (substr(typeof(f.value),1,1),'A','ARRAY','B','BOOLEAN','I','FLOAT','D','FLOAT','STRING')     AS attribute_type,  -- This generates column datatypes of ARRAY, BOOLEAN, FLOAT, and STRING only
                 REGEXP_REPLACE(REGEXP_REPLACE(f.path, '\\\\[(.+)\\\\]'),'[^a-zA-Z0-9]','_')                         AS alias_name       -- This generates column aliases based on the path
