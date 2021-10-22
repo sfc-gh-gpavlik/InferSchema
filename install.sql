@@ -496,7 +496,7 @@ as
 $$
 /****************************************************************************************************************
 *                                                                                                               *
-* CREATE_VIEW_OVER_JSON - Craig Warman, Alan Eldridge and Greg Pavlik Snowflake Computing, 2019, 2020, 2021     *
+* CREATE_VIEW_OVER_JSON - Craig Warman, Alan Eldridge and Greg Pavlik Snowflake Computing, (c) 2019, 2020, 2021 *
 *                                                                                                               *
 * This stored procedure creates a view on a table that contains JSON data in a column.                          *
 * of type VARIANT.  It can be used for easily generating views that enable access to                            *
@@ -512,20 +512,16 @@ $$
 * call create_view_over_json('db.schema.semistruct_data', 'variant_col', 'db.schema.semistruct_data_vw');       *
 *                                                                                                               *
 * Important notes:                                                                                              *
-*   - This is the "basic" version of a more sophisticated procedure. Its primary purpose                        *
-*     is to illustrate the view generation concept.                                                             *
 *   - This version of the procedure does not support:                                                           *
 *         - Column case preservation (all view column names will be case-insensitive).                          *
 *         - JSON document attributes that are SQL reserved words (like TYPE or NUMBER).                         *
 *         - "Exploding" arrays into separate view columns - instead, arrays are simply                          *
 *           materialized as view columns of type ARRAY.                                                         *
-*   - Execution of this procedure may take an extended period of time for very                                  *
-*     large datasets, or for datasets with a wide variety of document attributes                                *
-*     (since the view will have a large number of columns).                                                     *
 *                                                                                                               *
 * Attribution:                                                                                                  *
-* I leveraged code developed by Alan Eldridge as the basis for this stored procedure.                           *
-*                                                                                                               *
+* Stored procedure original concept and execution, Craig Warman                                                 *
+* Typecasting of variant types uses SQL code developed by Alan Eldridge as the basis for this procedure.        *
+* Procedure rewritten and maintained by Greg Pavik with Craig's and Alan's permission.                          *
 ****************************************************************************************************************/
 
 const ROW_SAMPLE_SIZE = 10000;
