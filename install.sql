@@ -91,7 +91,7 @@ timestamp_format = 'auto'
 null_if = ('\\N')
 ;
 
-create or replace procedure UTIL_DB.PUBLIC.INFER_DELIMITED_SCHEMA(STAGE_PATH string, FILE_FORMAT string, FIRST_ROW_IS_HEADER boolean, NEW_TABLE_NAME string)
+create or replace procedure INFER_DELIMITED_SCHEMA(STAGE_PATH string, FILE_FORMAT string, FIRST_ROW_IS_HEADER boolean, NEW_TABLE_NAME string)
 returns string
 language javascript
 execute as caller
@@ -489,7 +489,7 @@ function getQuery(sql){
 
 $$;
 
-create or replace procedure util_db.public.create_view_over_variant (TABLE_NAME varchar, COL_NAME varchar, VIEW_NAME varchar)
+create or replace procedure create_view_over_variant (TABLE_NAME varchar, COL_NAME varchar, VIEW_NAME varchar)
 returns varchar
 language javascript
 as
