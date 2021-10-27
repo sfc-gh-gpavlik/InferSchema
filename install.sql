@@ -27,15 +27,15 @@ language SQL
 as
 $$
     case
-        when STR RLIKE '[A-Za-z]{3} \\d{2} \\d{4} \\d{2}:\\d{2}:\\d{2} UTC' then try_to_timestamp(left(STR, 20), 'MON DD YYYY HH24:MI:SS')
+        when STR RLIKE '[A-Za-z]{3} \\d{2} \\d{4} \\d{1,2}:\\d{2}:\\d{2}' then try_to_timestamp(left(STR, 20), 'MON DD YYYY HH24:MI:SS')
         when STR RLIKE '\\d{1,4}-\\d{1,2}-\\d{2} \\d{1,2}:\\d{2}:\\d{2} [A|P][M]' then try_to_timestamp(STR, 'YYYY-MM-DD HH12:MI:SS AM')
         when STR RLIKE '\\d{1,2}/\\d{1,2}/\\d{4}' then try_to_timestamp(STR, 'mm/dd/yyyy')
         when STR RLIKE '\\d{1,2}\\/\\d{1,2}\\/\\d{4} \\d{1,2}:\\d{2}:\\d{2} [A-Za-z]{2}' then try_to_timestamp(STR, 'MM/DD/YYYY HH12:MI:SS AM')
         when STR RLIKE '\\d{1,2}\\/\\d{1,2}\\/\\d{4} \\d{1,2}:\\d{2}' then try_to_timestamp(STR, 'MM/DD/YYYY HH24:MI')
-        when STR RLIKE '[A-Za-z]{3}, \\d{1,2} [A-Za-z]{3} \\d{4} \\d{1,2}:\\d{1,2}:\\d{1,2} [A-Za-z]{3}' then try_to_timestamp(left(STR, len(STR) - 4) || ' ' || '00:00', 'DY, DD MON YYYY HH:MI:SS TZH:TZM')   -- Fri, 17 Apr 2020 17:55:45 GMT  (from Snowflake "LIST" command)
+        when STR RLIKE '[A-Za-z]{3}, \\d{1,2} [A-Za-z]{3} \\d{4} \\d{1,2}:\\d{1,2}:\\d{1,2} [A-Za-z]{3}' then try_to_timestamp(left(STR, len(STR) - 4) || ' ' || '00:00', 'DY, DD MON YYYY HH:MI:SS TZH:TZM')   -- From Snowflake "LIST" command
         when STR RLIKE '\\d{1,2}/\\d{1,2}/\\d{2} \\d{1,2}:\\d{2} [A|P][M]' then try_to_timestamp(STR, 'MM/DD/YY HH12:MI AM')
-        when STR RLIKE '[A-Za-z]{3} [A-Za-z]{3} \\d{2} \\d{4} \\d{1,2}:\\d{2}:\\d{2} GMT.*' then try_to_timestamp(left(replace(substr('Sat Oct 02 2021 17:53:40 GMT+0000 (Coordinated Universal Time)', 5), 'GMT', ''), 26), 'MON DD YYYY HH:MI:SS TZHTZM')  -- Javascript
-        else try_to_timestamp(STR)                                                                                                                                                                          -- Last chance try for unknown timestamp format
+        when STR RLIKE '[A-Za-z]{3} [A-Za-z]{3} \\d{2} \\d{4} \\d{1,2}:\\d{2}:\\d{2} GMT.*' then try_to_timestamp(left(replace(substr(STR, 5), 'GMT', ''), 26), 'MON DD YYYY HH:MI:SS TZHTZM')  -- Javascript
+        else try_to_timestamp(STR) -- Final try without format specifier.
     end
 $$;
 
