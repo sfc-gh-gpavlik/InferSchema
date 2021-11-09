@@ -655,7 +655,7 @@ FROM
         LATERAL FLATTEN(@~COL_NAME~@, RECURSIVE=>true) f
 WHERE   TYPEOF(f.value) != 'OBJECT'
         AND NOT contains(f.path, '[')         -- This prevents traversal down into arrays
-limit   ${ROW_SAMPLE_SIZE};
+limit   ${ROW_SAMPLE_SIZE}
 `;
 
     sql = sql.replace(/@~TABLE_NAME~@/g, tableName);
