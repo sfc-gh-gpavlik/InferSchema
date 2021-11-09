@@ -6,22 +6,22 @@ create or replace stage INFER_DELIMITED;
 copy into @INFER_DELIMITED from (
 
   select
-  	 L_ORDERKEY::string
-	,L_PARTKEY::string
-	,L_SUPPKEY::string
-	,L_LINENUMBER::string
-	,L_QUANTITY::string
-	,L_EXTENDEDPRICE::string
-	,L_DISCOUNT::string
-	,L_TAX::string
-	,L_RETURNFLAG::string
-	,L_LINESTATUS::string
-	,L_SHIPDATE::string
-	,L_COMMITDATE::string
-	,L_RECEIPTDATE::string
-	,L_SHIPINSTRUCT::string
-	,L_SHIPMODE::string
-	,L_COMMENT::string
+  	 L_ORDERKEY::string      as L_ORDERKEY
+	,L_PARTKEY::string       as L_PARTKEY
+	,L_SUPPKEY::string       as L_SUPPKEY
+	,L_LINENUMBER::string    as L_LINENUMBER
+	,L_QUANTITY::string      as L_QUANTITY
+	,L_EXTENDEDPRICE::string as L_EXTENDEDPRICE
+	,L_DISCOUNT::string      as L_DISCOUNT
+	,L_TAX::string           as L_TAX
+	,L_RETURNFLAG::string    as L_RETURNFLAG
+	,L_LINESTATUS::string    as L_LINESTATUS
+	,L_SHIPDATE::string      as L_SHIPDATE
+	,L_COMMITDATE::string    as L_COMMITDATE
+	,L_RECEIPTDATE::string   as L_RECEIPTDATE
+	,L_SHIPINSTRUCT::string  as L_SHIPINSTRUCT
+	,L_SHIPMODE::string      as L_SHIPMODE
+	,L_COMMENT::string       as L_COMMENT
     
   from "SNOWFLAKE_SAMPLE_DATA"."TPCH_SF1"."LINEITEM"
 union all
