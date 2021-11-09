@@ -102,11 +102,13 @@ $$
 *  Preferences Section                                                                              *
 ****************************************************************************************************/
 
-MAX_ROW_SAMPLES          = 100000;        // Sets the maximum number of rows the inference will test.
-PROJECT_NAMESPACE        = "UTIL_DB.PUBLIC"
-USE_TRY_MULTI_TIMESTAMP  = true;
-REGULARIZE_COLUMN_NAMES  = true;
-NUMBERED_COLUMN_PREFIX   = "COLUMN_";
+const MAX_ROW_SAMPLES          = 100000;        // Sets the maximum number of rows the inference will test.
+const PROJECT_NAMESPACE        = "UTIL_DB.PUBLIC"
+const USE_TRY_MULTI_TIMESTAMP  = true;
+const REGULARIZE_COLUMN_NAMES  = true;
+const NUMBERED_COLUMN_PREFIX   = "COLUMN_";
+const RAW_SUFFIX               = "_raw";
+const NONCONFORMING_SUFFIX     = "_NONCONFORMING";
 
 /****************************************************************************************************
 *  Do not modify below this section                                                                 *
@@ -236,7 +238,7 @@ if (FIRST_ROW_IS_HEADER) {
     header = [];
     let cols = headerRow.split(',');
     for (let colPos = 0; colPos < cols.length; colPos++ ) {
-        header.push("$" + colPos+1);
+        header.push(NUMBERED_COLUMN_PREFIX + colPos+1);
     }
 }
 
@@ -257,12 +259,18 @@ let typeOf;
 let ins = '';
 
 var newTableDDL = '';
+var badTableDDL = '';
 var insertDML   = '';
 
 for (let c = 0; c < header.length; c++) {
     if(c > 0){
-        newTableDDL += ",\n";
-        insertDML   += ",\n";
+        newTableDDL += "\n\t,";
+        badTableDDL += "\n\t,";
+        insertDML   += "\n\t,";
+    } else {
+        newTableDDL += "\t ";
+        badTableDDL += "\t ";
+        insertDML   += "\n\t,";
     }
     if (FIRST_ROW_IS_HEADER) {
         column = '"' + header[c] + '"';
@@ -272,22 +280,90 @@ for (let c = 0; c < header.length; c++) {
 
     typeOf = InferDataType(header[c], c + 1, qMain.statement.getQueryId());
     newTableDDL += GetColumnDdlName(typeOf, FIRST_ROW_IS_HEADER, NUMBERED_COLUMN_PREFIX) + ' ' + typeOf.syntax;
+    badTableDDL += GetColumnDdlName(typeOf, FIRST_ROW_IS_HEADER, NUMBERED_COLUMN_PREFIX) + ' string';
     ins = typeOf.insert;
-    insertDML   += ins.replace(/@~COLUMN~@/g, "$" + typeOf.ordinalPosition);
+    insertDML   += ins.replace(/@~COLUMN~@/g, "$" + typeOf.ordinalPosition) + " as " + `"${header[c]}"`;
 }
 
-return GetOpeningComments()                       +
-       GetDDLPrefixSQL(NEW_TABLE_NAME)            +
-       newTableDDL                                +
-       GetDDLSuffixSQL()                          +
-       GetDividerSQL()                            +
-       GetInsertPrefixSQL(NEW_TABLE_NAME)         +
-       insertDML                                  +
-       GetInsertSuffixSQL(STAGE_PATH, FILE_FORMAT);
+let insertStatement;
+
+insertStatement = GetInsertPrefixSQL(NEW_TABLE_NAME)         +
+                  insertDML                                  +
+                  GetInsertSuffixSQL(STAGE_PATH, FILE_FORMAT);
+
+let mtInsert = getMultiInsert(
+                     NEW_TABLE_NAME
+                    ,getColumnList(header, "", false)
+                    ,NONCONFORMING_SUFFIX
+                    ,getColumnConditions(header, RAW_SUFFIX)
+                    ,getColumnList(header, RAW_SUFFIX, false)
+                    ,getColumnList(header, RAW_SUFFIX, true)
+                    ,insertDML
+                    ,STAGE_PATH
+                    ,FILE_FORMAT
+                );
+                
+return GetOpeningComments()                                  +
+       GetDDLPrefixSQL(NEW_TABLE_NAME)                       +
+       newTableDDL                                           +
+       GetDDLSuffixSQL()                                     +
+       GetBadPrefixSQL(NEW_TABLE_NAME, NONCONFORMING_SUFFIX) +
+       badTableDDL                                           +
+       GetDDLSuffixSQL()                                     +
+       GetDividerSQL()                                       +
+       mtInsert;
 
 /****************************************************************************************************
 *  Helper functions                                                                                 *
 ****************************************************************************************************/
+
+function getMultiInsert(tableName, columnList, nonconformingSuffix, conditionList, rawColumnList, rawColumns, tryColumns, stageName, fileFormat) {
+return `
+insert first when
+${conditionList}
+then into ${tableName}${nonconformingSuffix}
+(
+${columnList}
+)
+values
+(
+${rawColumnList}
+)
+else into LINEITEM
+(
+${columnList}
+)
+values
+(
+${columnList}
+)
+select 
+${rawColumns}
+
+${tryColumns}
+
+from ${stageName} (file_format => '${fileFormat}');
+`;
+}
+
+function getColumnConditions(header, suffix) {  // NOTE: Improve by writing only non-string types
+    let list = "\t   ";
+    for(let i = 0; i < header.length; i++) {
+        if(i > 0) list += "\n\tor ";
+        list += `"${header[i]}"\tis null and\t"${header[i]}${suffix}"\t is not null`;
+    }
+    return list;
+}
+
+function getColumnList(header, suffix, numberThem) {
+    let list = "\t ";
+    for(let i = 0; i < header.length; i++) {
+        if(i > 0) list += "\n\t,";
+        if(numberThem) list += "$" + `${i+1} as `;
+        list += `"${header[i]}${suffix}"`;
+    }
+    return list;
+}
 
 function InferDataType(column, ordinalPosition, sourceQuery){
 
@@ -386,6 +462,18 @@ function GetDDLPrefixSQL(table) {
 var sql =
 `
 create or replace table ${table}
+(
+`;
+
+    return sql;
+}
+  
+function GetBadPrefixSQL(table, suffix) {
+
+var sql =
+`
+
+create or replace table ${table}${suffix}
 (
 `;
 
