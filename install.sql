@@ -329,7 +329,7 @@ values
 (
 ${rawColumnList}
 )
-else into LINEITEM
+else into ${tableName}
 (
 ${columnList}
 )
