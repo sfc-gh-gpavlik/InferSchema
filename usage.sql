@@ -2,7 +2,7 @@
 
 create or replace stage INFER_DELIMITED;
 
--- Get some good rows:
+-- Get some good and bad rows for testing:
 copy into @INFER_DELIMITED from (
 
   select
