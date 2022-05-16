@@ -647,9 +647,9 @@ function GetElementQuery(tableName, columnName){
 
 sql = 
 `
-SELECT DISTINCT regexp_replace(regexp_replace(f.path,'\\\\[(.+)\\\\]'),'(\\\\w+)','\"\\\\1\"')                      AS path_name,       -- This generates paths with levels enclosed by double quotes (ex: "path"."to"."element").  It also strips any bracket-enclosed array element references (like "[0]")
-                DECODE (substr(typeof(f.value),1,1),'A','ARRAY','B','BOOLEAN','I','FLOAT','D','FLOAT','STRING')     AS attribute_type,  -- This generates column datatypes of ARRAY, BOOLEAN, FLOAT, and STRING only
-                REGEXP_REPLACE(REGEXP_REPLACE(f.path, '\\\\[(.+)\\\\]'),'[^a-zA-Z0-9]','_')                         AS alias_name       -- This generates column aliases based on the path
+SELECT DISTINCT '"' || array_to_string(split(f.path, '.'), '"."') || '"'                                         AS path_nAme,       -- This generates paths with levels enclosed by double quotes (ex: "path"."to"."element").  It also strips any bracket-enclosed array element references (like "[0]")
+                DECODE (substr(typeof(f.value),1,1),'A','ARRAY','B','BOOLEAN','I','FLOAT','D','FLOAT','STRING')  AS attribute_type,  -- This generates column datatypes of ARRAY, BOOLEAN, FLOAT, and STRING only
+                '"' || array_to_string(split(f.path, '.'), '.') || '"'                                           AS alias_name       -- This generates column aliases based on the path
 FROM
         @~TABLE_NAME~@,
         LATERAL FLATTEN(@~COL_NAME~@, RECURSIVE=>true) f
@@ -679,9 +679,9 @@ function GetColumnList(elementRS){
         if (col_list != "") {
             col_list += ", \n";
         }
-        col_list += COL_NAME + ":" + elementRS.getColumnValue("PATH_NAME");         // Start with the element path name
-        col_list += "::"           + elementRS.getColumnValue("ATTRIBUTE_TYPE");    // Add the datatype
-        col_list += " as "         + elementRS.getColumnValue("ALIAS_NAME");        // And finally the element alias
+        col_list += COL_NAME + ":" + elementRS.getColumnValue("PATH_NAME");      // Start with the element path name
+        col_list += "::"           + elementRS.getColumnValue("ATTRIBUTE_TYPE"); // Add the datatype
+        col_list += ' as '         + elementRS.getColumnValue("ALIAS_NAME");     // And finally the element alias
     }
     return col_list;
 }
